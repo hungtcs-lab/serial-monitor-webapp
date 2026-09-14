@@ -6,6 +6,8 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 // https://vite.dev/config/
 export default defineConfig({
+  // GitHub Pages 部署在子路径下，由 CI 通过 BASE_PATH 传入（如 /serial-monitor-webapp/）
+  base: process.env.BASE_PATH ?? '/',
   plugins: [
     react(),
     babel({ presets: [reactCompilerPreset()] }),
