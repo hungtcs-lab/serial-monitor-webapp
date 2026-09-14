@@ -10,6 +10,9 @@ export class WebSocketTransport implements Transport {
   readonly kind = 'websocket'
   private socket: WebSocket | null = null
   private closing = false
+  /** open 之后、read 开始之前收到的消息先缓存，避免丢失连接建立时的欢迎语 */
+  private pending: Uint8Array[] = []
+  private onData: ((chunk: Uint8Array) => void) | null = null
 
   readonly url: string
 
@@ -22,6 +25,11 @@ export class WebSocketTransport implements Transport {
     return new Promise<void>((resolve, reject) => {
       const socket = new WebSocket(this.url)
       socket.binaryType = 'arraybuffer'
+      socket.onmessage = (event) => {
+        const chunk = typeof event.data === 'string' ? encoder.encode(event.data) : new Uint8Array(event.data)
+        if (this.onData) this.onData(chunk)
+        else this.pending.push(chunk)
+      }
       socket.onopen = () => {
         this.socket = socket
         resolve()
@@ -33,10 +41,9 @@ export class WebSocketTransport implements Transport {
   read({ onData }: ReadHandlers) {
     const socket = this.socket
     if (!socket) return Promise.resolve<ReadEndReason>('closed')
+    this.onData = onData
+    for (const chunk of this.pending.splice(0)) onData(chunk)
     return new Promise<ReadEndReason>((resolve) => {
-      socket.onmessage = (event) => {
-        onData(typeof event.data === 'string' ? encoder.encode(event.data) : new Uint8Array(event.data))
-      }
       socket.onclose = () => resolve(this.closing ? 'closed' : 'lost')
     })
   }

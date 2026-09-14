@@ -74,20 +74,23 @@ export class LogModel {
   }
 
   appendTx(bytes: Uint8Array, time = Date.now()) {
-    this.interruptRx()
+    this.closeRx()
     const lines = this.editableLines()
     const text = new TextDecoder().decode(bytes)
     const pieces = text.split(LINE_BREAK)
     if (pieces.length > 1 && pieces.at(-1) === '') pieces.pop()
     for (const piece of pieces) {
-      this.onLineClosed?.(this.pushLine(lines, 'tx', piece, time))
+      const line = this.pushLine(lines, 'tx', piece, time)
+      this.onLineClosed?.(line)
     }
     this.appendHex('tx', bytes, time)
   }
 
   appendSys(text: string, level: SysLevel = 'info', time = Date.now()) {
-    this.interruptRx()
-    this.onLineClosed?.(this.pushLine(this.editableLines(), 'sys', text, time, level))
+    this.closeRx()
+    // 注意不能写成 onLineClosed?.(pushLine(...))：可选调用短路时参数不会被求值
+    const line = this.pushLine(this.editableLines(), 'sys', text, time, level)
+    this.onLineClosed?.(line)
     const rows = this.editableHex()
     rows.push({ kind: 'sys', id: this.nextId++, dir: 'sys', time, text, level })
     this.hexOpen = false
@@ -96,7 +99,7 @@ export class LogModel {
 
   /** 新会话开始：丢弃半个 UTF-8 字符与残留的 ANSI 样式 */
   resetStream() {
-    this.interruptRx()
+    this.closeRx()
     this.rxDecoder = new TextDecoder()
     this.rxStyle = {}
     this.pendingCR = false
@@ -141,17 +144,13 @@ export class LogModel {
     return line
   }
 
+  /** 结束当前接收行：遇到换行，或被发送 / 系统消息打断（后续接收数据另起一行） */
   private closeRx() {
     if (!this.rxOpen) return
     const line = this.lines[this.lines.length - 1]
     this.rxStyle = ansiEndStyle(line.text, line.startStyle)
     this.rxOpen = false
     this.onLineClosed?.(line)
-  }
-
-  /** 发送或系统消息插入时结束当前接收行，后续接收数据另起一行 */
-  private interruptRx() {
-    this.closeRx()
   }
 
   private appendHex(dir: 'rx' | 'tx', bytes: Uint8Array, time: number) {
