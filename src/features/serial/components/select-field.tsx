@@ -11,6 +11,7 @@ interface SelectFieldProps<T extends string> {
   placeholder?: string
   disabled?: boolean
   width?: string
+  size?: 'xs' | 'sm'
   /** 放在 Popover 等浮层内部时关闭 Portal，避免被识别为外部点击 */
   portalled?: boolean
 }
@@ -25,6 +26,7 @@ export function SelectField<T extends string>({
   placeholder,
   disabled,
   width = 'full',
+  size = 'sm',
   portalled = true,
 }: SelectFieldProps<T>) {
   const collection = createListCollection({ items: options })
@@ -32,7 +34,7 @@ export function SelectField<T extends string>({
   return (
     <Field.Root width={width} disabled={disabled}>
       <Select.Root
-        size="sm"
+        size={size}
         collection={collection}
         value={value === null ? [] : [value]}
         onValueChange={(e) => {

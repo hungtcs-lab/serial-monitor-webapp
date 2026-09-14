@@ -1,5 +1,6 @@
 import { Combobox, Field, Portal, useFilter, useListCollection } from '@chakra-ui/react'
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { BAUD_RATES } from '../lib/constants'
 
 const BAUD_RATE_ITEMS = BAUD_RATES.map((rate) => ({ label: String(rate), value: String(rate) }))
@@ -8,8 +9,6 @@ interface BaudRateComboboxProps {
   value: number
   onValueChange: (value: number) => void
   disabled?: boolean
-  hideLabel?: boolean
-  width?: string
 }
 
 function parseBaudRate(raw: string): number | null {
@@ -18,12 +17,19 @@ function parseBaudRate(raw: string): number | null {
 }
 
 /** 波特率：可从常用值中选择，也可直接输入自定义值（回车或失焦生效） */
-export function BaudRateCombobox({ value, onValueChange, disabled, hideLabel, width = 'full' }: BaudRateComboboxProps) {
+export function BaudRateCombobox({ value, onValueChange, disabled }: BaudRateComboboxProps) {
+  const { t } = useTranslation()
   const [inputValue, setInputValue] = useState(String(value))
+  const [syncedValue, setSyncedValue] = useState(value)
   const [highlighted, setHighlighted] = useState<string | null>(null)
   const { startsWith } = useFilter({ sensitivity: 'base' })
   const { collection, filter } = useListCollection({ initialItems: BAUD_RATE_ITEMS, filter: startsWith })
-  const invalid = parseBaudRate(inputValue) === null
+
+  // 外部值变化（切换设备时载入该设备的参数）时同步输入框
+  if (value !== syncedValue) {
+    setSyncedValue(value)
+    setInputValue(String(value))
+  }
 
   function commit(raw: string) {
     const rate = parseBaudRate(raw)
@@ -36,7 +42,7 @@ export function BaudRateCombobox({ value, onValueChange, disabled, hideLabel, wi
   }
 
   return (
-    <Field.Root width={width} disabled={disabled} invalid={invalid}>
+    <Field.Root disabled={disabled} invalid={parseBaudRate(inputValue) === null}>
       <Combobox.Root
         size="sm"
         collection={collection}
@@ -56,11 +62,12 @@ export function BaudRateCombobox({ value, onValueChange, disabled, hideLabel, wi
           if (e.open && e.reason !== 'input-change') filter('')
         }}
       >
-        <Combobox.Label srOnly={hideLabel}>波特率</Combobox.Label>
+        <Combobox.Label srOnly>{t('connection.baudRate')}</Combobox.Label>
         <Combobox.Control>
           <Combobox.Input
             inputMode="numeric"
-            placeholder="波特率"
+            fontFamily="mono"
+            placeholder={t('connection.baudRate')}
             onBlur={() => commit(inputValue)}
             onKeyDown={(e) => {
               // 有高亮项时交给组件选中该项，否则提交输入的自定义值
@@ -74,9 +81,9 @@ export function BaudRateCombobox({ value, onValueChange, disabled, hideLabel, wi
         <Portal>
           <Combobox.Positioner>
             <Combobox.Content>
-              <Combobox.Empty>回车使用自定义波特率</Combobox.Empty>
+              <Combobox.Empty>{t('connection.customBaudRate')}</Combobox.Empty>
               {collection.items.map((item) => (
-                <Combobox.Item item={item} key={item.value}>
+                <Combobox.Item item={item} key={item.value} fontFamily="mono">
                   {item.label}
                   <Combobox.ItemIndicator />
                 </Combobox.Item>
